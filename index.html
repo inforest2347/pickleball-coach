@@ -86,12 +86,40 @@
   .row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
   .row2 > * { min-width: 0; }
   input[type=date] { min-width: 0; max-width: 100%; display: block; min-height: 44px; }
+  /* 課堂學員 */
+  .prev { background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--green); border-radius: var(--radius);
+    padding: 12px 14px; margin-bottom: 14px; font-size: 14px; }
+  .prev .h { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .prev .k { font-weight: 700; color: var(--green-dark); }
+  .prev p { margin: 4px 0 0; white-space: pre-wrap; }
+  details.sc { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 10px; }
+  details.sc > summary { list-style: none; padding: 12px 14px; cursor: pointer; }
+  details.sc > summary::-webkit-details-marker { display: none; }
+  details.sc[open] > summary { border-bottom: 1px solid var(--green-light); }
+  .sc-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .sc-name { font-weight: 700; color: var(--green-dark); font-size: 16px; }
+  .sc-level { font-size: 13px; color: var(--muted); font-weight: 400; margin-left: 6px; }
+  .sc-arrow { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  details.sc[open] .sc-arrow { transform: rotate(90deg); display: inline-block; }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--green-light); color: var(--green-dark); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); font-weight: 600; }
+  .pill.grey { background: #eef1ef; color: var(--muted); }
+  .sc-body { padding: 10px 14px 14px; font-size: 14px; }
+  .sc-att { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+  .note { border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 8px; }
+  .note:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+  .note .m { font-size: 12px; color: var(--muted); }
+  .note .l { margin-top: 2px; white-space: pre-wrap; }
+  .note .l b { color: var(--green-dark); font-weight: 600; }
+  .sc-actions { margin-top: 12px; }
+  .sc-actions button { padding: 9px; font-size: 14px; }
 </style>
 </head>
 <body>
 
 <header>
-  <button class="back hidden" id="btnBack" type="button">‹ 返回清單</button>
+  <button class="back hidden" id="btnBack" type="button">‹ 返回</button>
   <div class="kicker">理論上匹克球｜教練</div>
   <h1 id="pageTitle">教練</h1>
 </header>
@@ -222,6 +250,24 @@
   <div class="bar"><div class="bar-inner"><button class="primary" id="btnJournal" type="button">送出日誌</button></div></div>
 </main>
 
+<!-- ============ 課堂學員：清單（沒指定課堂時） ============ -->
+<main id="viewRosterList" class="hidden">
+  <div class="hint" style="margin:0 4px 10px">點一堂課，查看這堂的學員與最近紀錄。</div>
+  <div id="rl_list"></div>
+</main>
+
+<!-- ============ 課堂學員 ============ -->
+<main id="viewRoster" class="hidden">
+  <div class="session-head">
+    <div class="t" id="r_title"></div>
+    <div class="s" id="r_sub"></div>
+  </div>
+  <div id="r_prev"></div>
+  <div class="section-title" id="r_count">學員</div>
+  <div id="r_students"></div>
+  <div class="bar hidden" id="r_bar"><div class="bar-inner"><button class="primary" id="btnRosterJournal" type="button"></button></div></div>
+</main>
+
 <!-- ============ 不可排日期 ============ -->
 <main id="viewUnavail" class="hidden">
   <div class="card">
@@ -252,15 +298,15 @@
 // ================================================================
 // 設定：建置手冊第 09 節
 // ================================================================
-const LIFF_ID = '2011926553-HztSwfha';          // 例：2001234567-AbCdEfGh
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbx9cI5ewgB8mSUg_lIiiqa9VcrWUice74TXzA8c_t4xP_D4q16ja7nyoAi7kDCI3JOz7A/exec';  // https://script.google.com/macros/s/…/exec
+const LIFF_ID = '請填入教練 LIFF ID';          // 例：2001234567-AbCdEfGh
+const GAS_URL = '請填入 GAS 網頁應用程式網址';  // https://script.google.com/macros/s/…/exec
 const SHOW_ERROR_CODE = true;                    // 測試期間顯示錯誤代碼；上線後改為 false
 
 // ================================================================
 // 共用
 // ================================================================
 const $ = (id) => document.getElementById(id);
-const VIEWS = ['viewLoading', 'viewError', 'viewDone', 'viewProfile', 'viewJournalList', 'viewJournalForm', 'viewUnavail'];
+const VIEWS = ['viewLoading', 'viewError', 'viewDone', 'viewProfile', 'viewJournalList', 'viewJournalForm', 'viewRosterList', 'viewRoster', 'viewUnavail'];
 const app = { idToken: '', page: 'profile', backTo: null };
 
 function show(view, title) {
@@ -484,8 +530,8 @@ async function openJournalList() {
   show('viewJournalList', '課程日誌');
 }
 
-function sessionItem(s, tag, extra) {
-  return el('button', { class: 'item', type: 'button', onclick: () => openJournalForm(s.id) }, [
+function sessionItem(s, tag, extra, onClick) {
+  return el('button', { class: 'item', type: 'button', onclick: onClick || (() => openJournalForm(s.id)) }, [
     el('div', { class: 'top' }, [
       el('span', { text: s.dateText + ' ' + s.start + (s.end ? '–' + s.end : '') }),
       tag ? el('span', { class: 'tag', text: tag }) : null,
@@ -495,9 +541,15 @@ function sessionItem(s, tag, extra) {
   ]);
 }
 
-async function openJournalForm(sessionId) {
+/**
+ * opt.preselect：開啟後直接加入這位學員的個別紀錄（從課堂學員頁進來時）
+ * opt.back：返回鍵與送出後要回到的頁面（預設回日誌清單）
+ */
+async function openJournalForm(sessionId, opt) {
+  opt = opt || {};
   const d = await load({ action: 'journalGet', sessionId: sessionId });
   if (!d) return;
+  journal.back = opt.back || { label: '回到日誌清單', fn: openJournalList };
   journal.sessionId = sessionId;
   journal.submissionId = newId();
   journal.roster = d.roster;
@@ -523,10 +575,17 @@ async function openJournalForm(sessionId) {
 
   banner('jf_banner', d.journal ? '修改已送出的日誌，可修改至 ' + j.editUntil + '。' : '', false);
   (d.individuals || []).forEach((i) => addStudentCard(i));
+  let focusCard = null;
+  if (opt.preselect && d.roster.some((r) => r.id === opt.preselect)) {
+    const existing = journal.students.find((x) => x.學員 === opt.preselect);
+    if (!existing) addStudentCard({ 學員: opt.preselect });
+    focusCard = (existing || journal.students[journal.students.length - 1]).card;
+  }
   refreshPicker();
   $('btnJournal').textContent = d.journal ? '儲存修改' : '送出日誌';
-  setBack(openJournalList);
+  setBack(journal.back.fn);
   show('viewJournalForm', d.journal ? '修改日誌' : '寫課程日誌');
+  if (focusCard) setTimeout(() => focusCard.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
 }
 
 function refreshPicker() {
@@ -567,6 +626,7 @@ function addStudentCard(data) {
     field('主要問題', problem), field('需要修正', fix),
     field('掌握程度（1＝還不會，5＝很熟練）', mastery), field('程度建議', advice), field('備註', note),
   ]);
+  entry.card = card;
   entry.read = () => ({
     紀錄ID: entry.紀錄ID, 學員: entry.學員,
     主要問題: problem.value.trim(), 需要修正: fix.value.trim(), 備註: note.value.trim(),
@@ -605,11 +665,115 @@ $('btnJournal').addEventListener('click', async () => {
     journal: j, individuals: journal.students.map((x) => x.read()),
   });
   if (!r.ok) {
-    if (r.uncertain) return showDone('可能已送出', r.message, { label: '回到日誌清單', fn: openJournalList });
+    if (r.uncertain) return showDone('可能已送出', r.message, journal.back);
     return banner('jf_banner', r.message, true);
   }
-  showDone(r.data.isNew ? '日誌已送出' : '已儲存修改', '辛苦了！', { label: '回到日誌清單', fn: openJournalList });
+  showDone(r.data.isNew ? '日誌已送出' : '已儲存修改', '辛苦了！', journal.back);
 });
+
+// ================================================================
+// 課堂學員
+// ================================================================
+const ATTEND_TAG = { 出席: '', 補課出席: '', 請假: '本堂請假', 缺席: '本堂缺席' };
+
+async function openRosterList() {
+  setBack(null);
+  const d = await load({ action: 'rosterSessions' });
+  if (!d) return;
+  const list = $('rl_list');
+  list.innerHTML = '';
+  if (!d.items.length) list.appendChild(el('div', { class: 'empty', text: '前後一週沒有你授課的課堂' }));
+  d.items.forEach((s) => list.appendChild(
+    sessionItem(s, s.date === d.today ? '今天' : '', '', () => openRoster(s.id, openRosterList))
+  ));
+  show('viewRosterList', '課堂學員');
+}
+
+/** back：返回鍵要回到哪裡；從 LINE 卡片直接開啟時沒有返回鍵 */
+async function openRoster(sessionId, back) {
+  const d = await load({ action: 'rosterGet', sessionId: sessionId });
+  if (!d) return;
+  const s = d.session;
+  const reopen = () => openRoster(sessionId, back);
+
+  $('r_title').textContent = s.dateText + ' ' + s.start + (s.end ? '–' + s.end : '') + '　' + (s.className || '');
+  $('r_sub').textContent = [s.tag, s.venue, s.lesson ? '第 ' + s.lesson + ' 堂' : '', '本班已上 ' + d.heldCount + ' 堂'].filter(Boolean).join('・');
+
+  // 上一堂的紀錄
+  const prevBox = $('r_prev');
+  prevBox.innerHTML = '';
+  const p = d.prev;
+  if (p && (p.教學主題 || p.下堂課建議 || p.交接注意事項)) {
+    const lines = [el('div', { class: 'h', text: '上一堂紀錄・' + p.dateText + (p.coach ? '・' + p.coach : '') })];
+    if (p.教學主題) lines.push(el('div', {}, [el('span', { class: 'k', text: '主題　' }), document.createTextNode(p.教學主題)]));
+    if (p.下堂課建議) lines.push(el('p', {}, [el('span', { class: 'k', text: '下堂課建議　' }), document.createTextNode(p.下堂課建議)]));
+    if (p.交接注意事項) lines.push(el('p', {}, [el('span', { class: 'k', text: '交接注意　' }), document.createTextNode(p.交接注意事項)]));
+    prevBox.appendChild(el('div', { class: 'prev' }, lines));
+  }
+
+  // 學員卡片
+  const canWrite = d.journalState === 'write' || d.journalState === 'edit';
+  const toJournal = (preselect) => openJournalForm(sessionId, {
+    preselect: preselect,
+    back: { label: '回到課堂學員', fn: reopen },
+  });
+  $('r_count').textContent = '學員 ' + d.students.length + ' 人' + (d.students.length ? '・點名字展開紀錄' : '');
+  const box = $('r_students');
+  box.innerHTML = '';
+  if (!d.students.length) box.appendChild(el('div', { class: 'empty', text: '這一堂目前沒有報名或出缺勤紀錄的學員' }));
+  d.students.forEach((st) => box.appendChild(studentCard(st, d.noteCount, canWrite ? () => toJournal(st.id) : null)));
+
+  // 底部按鈕
+  const label = { write: '寫這堂的日誌', edit: '修改這堂的日誌' }[d.journalState];
+  $('r_bar').classList.toggle('hidden', !label);
+  if (label) {
+    $('btnRosterJournal').textContent = label;
+    $('btnRosterJournal').onclick = () => toJournal('');
+  }
+  setBack(back || null);
+  show('viewRoster', '課堂學員');
+}
+
+function studentCard(st, noteCount, onWrite) {
+  const pills = [];
+  if (st.makeup) pills.push(el('span', { class: 'pill', text: '補課生' }));
+  if (ATTEND_TAG[st.thisStatus]) pills.push(el('span', { class: 'pill grey', text: ATTEND_TAG[st.thisStatus] }));
+  if (st.advice) pills.push(el('span', { class: 'pill warn', text: st.advice }));
+  if (!st.notes.length) pills.push(el('span', { class: 'pill grey', text: '尚無個別紀錄' }));
+
+  const a = st.stats;
+  const body = [el('div', { class: 'sc-att', text: '本班出缺勤：出席 ' + a.出席 + '・請假 ' + a.請假 + '・缺席 ' + a.缺席 })];
+  st.notes.forEach((n) => {
+    const meta = [n.dateText, n.coach, n.sameClass ? '' : n.className].filter(Boolean).join('・');
+    const lines = [el('div', { class: 'm', text: meta })];
+    const add = (k, v) => { if (v) lines.push(el('div', { class: 'l' }, [el('b', { text: k + '　' }), document.createTextNode(v)])); };
+    add('問題', n.主要問題);
+    add('修正', n.需要修正);
+    add('掌握', n.掌握程度 ? n.掌握程度 + ' / 5' : '');
+    add('建議', n.程度建議);
+    add('備註', n.備註);
+    body.push(el('div', { class: 'note' }, lines));
+  });
+  if (st.noteTotal > st.notes.length) {
+    body.push(el('div', { class: 'hint', text: '只顯示最近 ' + noteCount + ' 筆，共 ' + st.noteTotal + ' 筆' }));
+  }
+  if (onWrite) {
+    body.push(el('div', { class: 'sc-actions' }, [
+      el('button', { class: 'ghost', type: 'button', text: '為這位學員寫紀錄', onclick: onWrite }),
+    ]));
+  }
+
+  return el('details', { class: 'sc' }, [
+    el('summary', {}, [
+      el('div', { class: 'sc-top' }, [
+        el('span', { class: 'sc-name' }, [document.createTextNode(st.name), st.level ? el('span', { class: 'sc-level', text: st.level }) : null]),
+        el('span', { class: 'sc-arrow', text: '›' }),
+      ]),
+      pills.length ? el('div', { class: 'pills' }, pills) : null,
+    ]),
+    el('div', { class: 'sc-body' }, body),
+  ]);
+}
 
 // ================================================================
 // 不可排日期
@@ -733,6 +897,8 @@ async function main() {
   app.page = params.page || 'profile';
   if (app.page === 'journal') {
     if (params.session) openJournalForm(params.session); else openJournalList();
+  } else if (app.page === 'roster') {
+    if (params.session) openRoster(params.session, openRosterList); else openRosterList();
   } else if (app.page === 'unavailable') {
     openUnavail();
   } else {
