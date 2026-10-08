@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>教練資料｜理論上匹克球</title>
+<style>
+  :root {
+    --green: #1f5f4a;
+    --green-dark: #16463a;
+    --green-light: #e6f0eb;
+    --bg: #f5f8f6;
+    --line: #c9d6d0;
+    --text: #222;
+    --muted: #6b7a74;
+    --warn: #b4572e;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    -webkit-text-size-adjust: 100%;
+  }
+  header {
+    background: var(--green);
+    color: #fff;
+    padding: 20px 16px 18px;
+  }
+  header .kicker { font-size: 12px; letter-spacing: .15em; opacity: .8; }
+  header h1 { margin: 2px 0 0; font-size: 22px; }
+  main { padding: 16px 16px 120px; max-width: 560px; margin: 0 auto; }
+  .card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .card h2 { font-size: 15px; color: var(--green-dark); margin: 0 0 12px; }
+  .banner {
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    font-size: 14px;
+    background: var(--green-light);
+    color: var(--green-dark);
+    border-left: 4px solid var(--green);
+  }
+  .banner.warn { background: #fff4ea; color: #7a3a17; border-left-color: var(--warn); }
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  label.title { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  label.title .req { color: var(--warn); margin-left: 2px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  input[type=text], input[type=tel], input[type=email], textarea {
+    width: 100%;
+    font-size: 16px; /* 避免 iOS 自動放大 */
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--text);
+    font-family: inherit;
+  }
+  textarea { min-height: 76px; resize: vertical; }
+  input:focus, textarea:focus { outline: 2px solid var(--green); outline-offset: -1px; border-color: transparent; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .chip { position: relative; }
+  .chip input { position: absolute; opacity: 0; pointer-events: none; }
+  .chip span {
+    display: block;
+    text-align: center;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-size: 14px;
+    background: #fff;
+    cursor: pointer;
+    user-select: none;
+  }
+  .chip input:checked + span { background: var(--green); border-color: var(--green); color: #fff; }
+  .chip input:focus-visible + span { outline: 2px solid var(--green-dark); outline-offset: 2px; }
+  .error-text { color: var(--warn); font-size: 13px; margin-top: 6px; display: none; }
+  .invalid .error-text { display: block; }
+  .invalid input, .invalid textarea { border-color: var(--warn); }
+  .bar {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: rgba(255,255,255,.96);
+    border-top: 1px solid var(--line);
+  }
+  .bar-inner { max-width: 560px; margin: 0 auto; }
+  button.primary {
+    width: 100%;
+    font-size: 16px; font-weight: 600;
+    padding: 14px;
+    border: 0; border-radius: 12px;
+    background: var(--green); color: #fff;
+    font-family: inherit;
+  }
+  button.primary:disabled { opacity: .55; }
+  button.ghost {
+    width: 100%; margin-top: 10px;
+    font-size: 15px; padding: 12px;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: #fff; color: var(--green-dark);
+    font-family: inherit;
+  }
+  .center { text-align: center; padding: 48px 16px; }
+  .center .big { font-size: 20px; font-weight: 700; color: var(--green-dark); margin: 12px 0 8px; }
+  .center p { color: var(--muted); margin: 0 0 4px; font-size: 15px; }
+  .spinner {
+    width: 36px; height: 36px; margin: 0 auto;
+    border: 3px solid var(--green-light); border-top-color: var(--green);
+    border-radius: 50%; animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .check {
+    width: 56px; height: 56px; margin: 0 auto; border-radius: 50%;
+    background: var(--green); color: #fff; font-size: 30px; line-height: 56px;
+  }
+  .hidden { display: none !important; }
+  .code { font-size: 12px; color: var(--muted); margin-top: 16px; word-break: break-all; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="kicker">理論上匹克球｜教練</div>
+  <h1 id="pageTitle">教練資料</h1>
+</header>
+
+<!-- 載入中 -->
+<section id="viewLoading" class="center">
+  <div class="spinner"></div>
+  <p style="margin-top:14px">載入中…</p>
+</section>
+
+<!-- 錯誤 -->
+<section id="viewError" class="center hidden">
+  <div class="big">無法開啟</div>
+  <p id="errorMsg">請關閉頁面後再試一次。</p>
+  <div class="code" id="errorCode"></div>
+  <div style="max-width:320px;margin:20px auto 0"><button class="ghost" onclick="location.reload()">重新載入</button></div>
+</section>
+
+<!-- 表單 -->
+<main id="viewForm" class="hidden">
+  <div id="statusBanner" class="banner"></div>
+
+  <form id="form" novalidate>
+    <div class="card">
+      <h2>基本資料</h2>
+      <div class="field" data-field="姓名">
+        <label class="title" for="f_name">姓名<span class="req">*</span></label>
+        <input type="text" id="f_name" maxlength="30" autocomplete="name">
+        <div class="error-text">請填寫姓名</div>
+      </div>
+      <div class="field" data-field="電話">
+        <label class="title" for="f_phone">手機<span class="req">*</span></label>
+        <input type="tel" id="f_phone" inputmode="numeric" maxlength="12" placeholder="0912345678" autocomplete="tel">
+        <div class="error-text">請填寫正確的電話，例如 0912345678</div>
+      </div>
+      <div class="field" data-field="Email">
+        <label class="title" for="f_email">Gmail<span class="req">*</span></label>
+        <input type="email" id="f_email" maxlength="100" placeholder="name@gmail.com" autocomplete="email">
+        <div class="hint">請填寫<b>手機上登入的 Google 帳號</b>，之後要用它登入教練 App。</div>
+        <div class="error-text">請填寫正確的 Email</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>教學資料</h2>
+      <div class="field">
+        <label class="title" for="f_cert">證照</label>
+        <textarea id="f_cert" maxlength="500" placeholder="例：PPR Level 1、USAPA 認證…"></textarea>
+      </div>
+      <div class="field">
+        <label class="title">可教程度</label>
+        <div class="chips" id="levels"></div>
+        <div class="hint">可複選</div>
+      </div>
+      <div class="field">
+        <label class="title" for="f_skill">擅長項目</label>
+        <textarea id="f_skill" maxlength="500" placeholder="例：新手入門、雙打戰術、發球"></textarea>
+      </div>
+      <div class="field">
+        <label class="title">可排課時段</label>
+        <div class="chips grid3" id="slots"></div>
+        <div class="hint">可複選</div>
+      </div>
+    </div>
+  </form>
+
+  <div class="bar">
+    <div class="bar-inner">
+      <button class="primary" id="btnSubmit" type="button">送出</button>
+    </div>
+  </div>
+</main>
+
+<!-- 完成 -->
+<section id="viewDone" class="center hidden">
+  <div class="check">✓</div>
+  <div class="big" id="doneTitle">已送出</div>
+  <p id="doneMsg"></p>
+  <div style="max-width:320px;margin:24px auto 0">
+    <button class="primary" onclick="closeLiff()">關閉</button>
+  </div>
+</section>
+
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+// ================================================================
+// 設定：建置手冊第 09 節
+// ================================================================
+const LIFF_ID = '請填入教練 LIFF ID';          // 例：2001234567-AbCdEfGh
+const GAS_URL = '請填入 GAS 網頁應用程式網址';  // https://script.google.com/macros/s/…/exec
+const SHOW_ERROR_CODE = true;                    // 測試期間顯示錯誤代碼；上線後改為 false
+
+// ================================================================
+const $ = (id) => document.getElementById(id);
+const state = { idToken: '', status: 'new', submissionId: newSubmissionId(), sending: false };
+
+const STATUS_TEXT = {
+  new:      { cls: '',     text: '第一次填寫：送出後由管理員審核，審核通過後會在聊天室通知你，並開放教練選單。' },
+  pending:  { cls: '',     text: '你的資料正在審核中，可以修改後重新送出。' },
+  active:   { cls: '',     text: '你已是在職教練，可以隨時更新資料。' },
+  staff:    { cls: '',     text: '你已是團隊成員，送出後管理員會確認是否加上教練身分。' },
+  inactive: { cls: 'warn', text: '你的帳號目前不是在職狀態，送出後由管理員確認。' },
+};
+
+function show(view) {
+  ['viewLoading', 'viewError', 'viewForm', 'viewDone'].forEach((v) => $(v).classList.toggle('hidden', v !== view));
+}
+
+function showError(message, code) {
+  $('errorMsg').textContent = message || '請關閉頁面後再試一次。';
+  $('errorCode').textContent = SHOW_ERROR_CODE && code ? '錯誤代碼：' + code : '';
+  show('viewError');
+}
+
+function newSubmissionId() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+/** 呼叫 GAS：不設定 Content-Type（text/plain），避免 CORS 預檢 */
+async function callGas(payload, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs || 20000);
+  try {
+    const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload), signal: ctrl.signal });
+    const text = await res.text();
+    try { return JSON.parse(text); } catch (e) { throw new Error('NON_JSON'); }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function el(tag, attrs, children) {
+  const n = document.createElement(tag);
+  Object.entries(attrs || {}).forEach(([k, v]) => {
+    if (k === 'text') n.textContent = v; else n.setAttribute(k, v);
+  });
+  (children || []).forEach((c) => n.appendChild(c));
+  return n;
+}
+
+function renderChips(container, name, items, selected) {
+  container.innerHTML = '';
+  const set = new Set(selected || []);
+  items.forEach((it) => {
+    const value = typeof it === 'string' ? it : it.id;
+    const label = typeof it === 'string' ? it : it.name;
+    const input = el('input', { type: 'checkbox', name: name, value: value });
+    input.checked = set.has(value);
+    container.appendChild(el('label', { class: 'chip' }, [input, el('span', { text: label })]));
+  });
+}
+
+function checkedValues(name) {
+  return Array.from(document.querySelectorAll('input[name="' + name + '"]:checked')).map((i) => i.value);
+}
+
+function normalizePhone(v) {
+  let s = String(v || '').replace(/\D/g, '');
+  if (s.length === 9 && s.charAt(0) === '9') s = '0' + s;
+  return s;
+}
+
+// ================================================================
+// 初始化
+// ================================================================
+async function main() {
+  try {
+    await liff.init({ liffId: LIFF_ID });
+  } catch (e) {
+    return showError('無法連接 LINE，請從官方帳號的選單開啟。', e.code || e.message);
+  }
+  if (!liff.isLoggedIn()) {
+    liff.login({ redirectUri: location.href });
+    return;
+  }
+  state.idToken = liff.getIDToken();
+  if (!state.idToken) return showError('無法取得 LINE 身分，請關閉後重新開啟。', 'NO_ID_TOKEN');
+
+  let data;
+  try {
+    data = await callGas({ action: 'init', idToken: state.idToken });
+  } catch (e) {
+    return showError('連線逾時，請稍後再試。', e.name === 'AbortError' ? 'TIMEOUT' : e.message);
+  }
+  if (!data.ok) return showError(data.message || '載入失敗，請稍後再試。', data.error);
+
+  state.status = data.status;
+  const c = data.coach || {};
+  $('f_name').value = c.姓名 || (data.profile && data.profile.name) || '';
+  $('f_phone').value = c.電話 || '';
+  $('f_email').value = c.Email || '';
+  $('f_cert').value = c.證照 || '';
+  $('f_skill').value = c.擅長項目 || '';
+  renderChips($('levels'), 'level', data.levels || [], c.可教程度);
+  renderChips($('slots'), 'slot', data.slots || [], c.可排課時段);
+
+  const st = STATUS_TEXT[data.status] || STATUS_TEXT.new;
+  $('statusBanner').textContent = st.text;
+  $('statusBanner').className = 'banner ' + st.cls;
+  $('pageTitle').textContent = data.status === 'new' ? '填寫教練資料' : '教練資料';
+  $('btnSubmit').textContent = data.status === 'new' ? '送出審核' : '儲存修改';
+  show('viewForm');
+}
+
+// ================================================================
+// 送出
+// ================================================================
+function collect() {
+  return {
+    姓名: $('f_name').value.trim(),
+    電話: normalizePhone($('f_phone').value),
+    Email: $('f_email').value.trim().toLowerCase(),
+    證照: $('f_cert').value.trim(),
+    擅長項目: $('f_skill').value.trim(),
+    可教程度: checkedValues('level'),
+    可排課時段: checkedValues('slot'),
+  };
+}
+
+function validate(f) {
+  const errors = {
+    姓名: !f.姓名,
+    電話: !/^0\d{8,9}$/.test(f.電話),
+    Email: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.Email),
+  };
+  let first = null;
+  Object.entries(errors).forEach(([k, bad]) => {
+    const box = document.querySelector('[data-field="' + k + '"]');
+    box.classList.toggle('invalid', bad);
+    if (bad && !first) first = box;
+  });
+  if (first) {
+    first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return false;
+  }
+  return true;
+}
+
+async function submit() {
+  if (state.sending) return;
+  const form = collect();
+  if (!validate(form)) return;
+
+  state.sending = true;
+  const btn = $('btnSubmit');
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '送出中…';
+
+  const payload = { action: 'save', idToken: state.idToken, submissionId: state.submissionId, form: form };
+  let result = null;
+  let lastError = '';
+  // 最多送兩次；同一個 submissionId，GAS 不會重複寫入
+  for (let i = 0; i < 2 && !result; i++) {
+    try {
+      const r = await callGas(payload, 20000);
+      if (r.ok) result = r;
+      else if (r.error === 'BUSY') lastError = r.error;
+      else { lastError = r.error; alertMessage(r.message || '送出失敗，請稍後再試。', r.error); break; }
+    } catch (e) {
+      lastError = e.name === 'AbortError' ? 'TIMEOUT' : e.message;
+    }
+  }
+
+  state.sending = false;
+  btn.disabled = false;
+  btn.textContent = label;
+
+  if (result) return done(result);
+  if (lastError === 'TIMEOUT' || lastError === 'NON_JSON' || lastError === 'BUSY') {
+    // 後端可能已經寫入，只是回應沒有傳回來
+    $('doneTitle').textContent = '可能已送出';
+    $('doneMsg').textContent = '連線不穩定，資料可能已經送出。請稍後重新開啟這個頁面確認；若資料沒有更新，再送出一次即可。';
+    show('viewDone');
+  }
+}
+
+function alertMessage(message, code) {
+  const banner = $('statusBanner');
+  banner.textContent = message + (SHOW_ERROR_CODE && code ? '（' + code + '）' : '');
+  banner.className = 'banner warn';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function done(r) {
+  const msg = {
+    new: '', // 不會出現
+    pending: r.isNew
+      ? '管理員審核通過後，會在聊天室通知你，並開放教練選單。'
+      : '資料已更新，仍在審核中。',
+    active: '資料已更新。',
+    staff: '資料已更新，管理員會確認是否加上教練身分。',
+    inactive: '資料已送出，管理員會與你聯繫。',
+  };
+  $('doneTitle').textContent = r.isNew ? '已送出審核' : '已儲存';
+  $('doneMsg').textContent = msg[r.status] || '資料已送出。';
+  show('viewDone');
+}
+
+function closeLiff() {
+  if (window.liff && liff.isInClient && liff.isInClient()) liff.closeWindow();
+  else window.close();
+}
+
+$('btnSubmit').addEventListener('click', submit);
+document.querySelectorAll('[data-field] input').forEach((inp) => {
+  inp.addEventListener('input', () => inp.closest('[data-field]').classList.remove('invalid'));
+});
+main();
+</script>
+</body>
+</html>
