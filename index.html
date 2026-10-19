@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>理論上匹克球｜教練</title>
+<!-- 先建立連線，第一個請求少等一段握手時間 -->
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="preconnect" href="https://static.line-scdn.net" crossorigin>
+<link rel="preconnect" href="https://api.line.me" crossorigin>
 <style>
   :root {
     --green: #1f5f4a; --green-dark: #16463a; --green-light: #e6f0eb;
@@ -114,6 +119,33 @@
   .note .l b { color: var(--green-dark); font-weight: 600; }
   .sc-actions { margin-top: 12px; }
   .sc-actions button { padding: 9px; font-size: 14px; }
+  .pill.ok { background: var(--green); color: #fff; }
+  .bar-inner.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .bar-inner.two button { padding: 13px 8px; font-size: 15px; }
+  /* 確認上課 */
+  .att { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; }
+  .att.unset { border-color: var(--warn); }
+  .att-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+  .att-name { font-weight: 700; color: var(--green-dark); font-size: 16px; }
+  .att-meta { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .att-meta.in { color: var(--green); font-weight: 600; }
+  .att .chip span { padding: 8px 6px; }
+  .summary { font-size: 14px; color: var(--muted); margin: 6px 4px 10px; }
+  .conflict { margin: 6px 0 0; padding-left: 18px; }
+  /* v4.1：先顯示上次的資料（更新中，按鈕暫停），新資料到了再換上 */
+  header { position: relative; }
+  .sync { position: absolute; right: 16px; top: 18px; font-size: 12px; background: rgba(255,255,255,.18); color: #fff;
+    padding: 3px 10px; border-radius: 999px; }
+  body.stale main button:not(.item), body.stale main input, body.stale main textarea, body.stale main select,
+  body.stale main .chip, body.stale .bar button { pointer-events: none; opacity: .55; }
+  .sk { padding: 16px; max-width: 560px; margin: 0 auto; }
+  .sk div { background: linear-gradient(90deg, #e9efec 25%, #f4f7f5 50%, #e9efec 75%); background-size: 200% 100%;
+    animation: sk 1.2s ease-in-out infinite; border-radius: var(--radius); margin-bottom: 10px; }
+  .sk .a { height: 64px; } .sk .b { height: 76px; } .sk .c { height: 16px; width: 40%; border-radius: 6px; }
+  @keyframes sk { to { background-position: -200% 0; } }
+  @media (prefers-reduced-motion: reduce) { .sk div { animation: none; } }
+  .toast { position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+    background: #16463a; color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 13px; z-index: 9; max-width: 90%; }
 </style>
 </head>
 <body>
@@ -122,12 +154,13 @@
   <button class="back hidden" id="btnBack" type="button">‹ 返回</button>
   <div class="kicker">理論上匹克球｜教練</div>
   <h1 id="pageTitle">教練</h1>
+  <span class="sync hidden" id="syncPill">更新中…</span>
 </header>
+<div class="toast hidden" id="toast" role="status"></div>
 
 <!-- 共用：載入中／錯誤 -->
-<section id="viewLoading" class="center">
-  <div class="spinner"></div>
-  <p style="margin-top:14px">載入中…</p>
+<section id="viewLoading" class="sk" aria-label="載入中">
+  <div class="c"></div><div class="a"></div><div class="b"></div><div class="b"></div><div class="b"></div>
 </section>
 <section id="viewError" class="center hidden">
   <div class="big">無法開啟</div>
@@ -265,11 +298,29 @@
   <div id="r_prev"></div>
   <div class="section-title" id="r_count">學員</div>
   <div id="r_students"></div>
-  <div class="bar hidden" id="r_bar"><div class="bar-inner"><button class="primary" id="btnRosterJournal" type="button"></button></div></div>
+  <div class="bar hidden" id="r_bar"><div class="bar-inner" id="r_barInner">
+    <button class="primary" id="btnRosterConfirm" type="button"></button>
+    <button class="primary" id="btnRosterJournal" type="button"></button>
+  </div></div>
+</main>
+
+<!-- ============ 確認上課（點名） ============ -->
+<main id="viewConfirm" class="hidden">
+  <div id="c_banner" class="banner hidden"></div>
+  <div class="session-head">
+    <div class="t" id="c_title"></div>
+    <div class="s" id="c_sub"></div>
+  </div>
+  <div class="hint" id="c_hint" style="margin:0 4px 10px"></div>
+  <div id="c_list"></div>
+  <button class="ghost" id="btnAllPresent" type="button">未選的學員全部設為出席</button>
+  <div class="summary" id="c_summary"></div>
+  <div class="bar"><div class="bar-inner"><button class="primary" id="btnConfirm" type="button">確認上課</button></div></div>
 </main>
 
 <!-- ============ 不可排日期 ============ -->
 <main id="viewUnavail" class="hidden">
+  <div id="u_warn" class="banner warn hidden"></div>
   <div class="card">
     <h2>新增不可排日期</h2>
     <div class="row2">
@@ -293,21 +344,20 @@
   <div id="u_list"></div>
 </main>
 
-<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
 // ================================================================
 // 設定：建置手冊第 09 節
 // ================================================================
-const LIFF_ID = '2011926553-HztSwfha';          // 例：2001234567-AbCdEfGh
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbx9cI5ewgB8mSUg_lIiiqa9VcrWUice74TXzA8c_t4xP_D4q16ja7nyoAi7kDCI3JOz7A/exec';  // https://script.google.com/macros/s/…/exec
-const SHOW_ERROR_CODE = false;                    // 測試期間顯示錯誤代碼；上線後改為 false
+const LIFF_ID = '請填入教練 LIFF ID';          // 例：2001234567-AbCdEfGh
+const GAS_URL = '請填入 GAS 網頁應用程式網址';  // https://script.google.com/macros/s/…/exec
+const SHOW_ERROR_CODE = true;                    // 測試期間顯示錯誤代碼；上線後改為 false
 
 // ================================================================
 // 共用
 // ================================================================
 const $ = (id) => document.getElementById(id);
-const VIEWS = ['viewLoading', 'viewError', 'viewDone', 'viewProfile', 'viewJournalList', 'viewJournalForm', 'viewRosterList', 'viewRoster', 'viewUnavail'];
-const app = { idToken: '', page: 'profile', backTo: null };
+const VIEWS = ['viewLoading', 'viewError', 'viewDone', 'viewProfile', 'viewJournalList', 'viewJournalForm', 'viewRosterList', 'viewRoster', 'viewConfirm', 'viewUnavail'];
+const app = { idToken: '', page: 'profile', backTo: null, nav: 0, early: false };
 
 function show(view, title) {
   VIEWS.forEach((v) => $(v).classList.toggle('hidden', v !== view));
@@ -378,30 +428,135 @@ function normalizePhone(v) {
   return s;
 }
 
+// ================================================================
+// 請求與快取（v4.1）
+//   1. 頁面一打開就用上次存下的 ID Token 送出請求，不必等 LIFF 初始化（Token 快過期時才等）
+//   2. 每一頁先畫出上次的資料（右上角顯示「更新中…」，按鈕暫停），新資料到了再換上
+//   3. 30 秒內在頁面之間來回，直接用記憶中的資料，不再請求
+//   4. 送出後，GAS 直接回傳要回去那一頁的資料
+// ================================================================
+const LS = 'coachOA:';
+const store = {
+  get(k, maxAgeMs) {
+    try {
+      const v = JSON.parse(localStorage.getItem(LS + k) || 'null');
+      return v && Date.now() - v.t < (maxAgeMs || 7 * 864e5) ? v.d : null;
+    } catch (e) { return null; }
+  },
+  set(k, d) {
+    try { localStorage.setItem(LS + k, JSON.stringify({ t: Date.now(), d: d })); } catch (e) { /* 空間不足或無痕模式：略過 */ }
+  },
+  del(k) {
+    try { localStorage.removeItem(LS + k); } catch (e) { /* 略過 */ }
+  },
+};
+const MEM_MS = 30000;
+const mem = {};
+function remember(key, d) {
+  mem[key] = { t: Date.now(), d: d };
+  store.set('v:' + key, d);
+}
+function recall(key) {
+  const m = mem[key];
+  return m && Date.now() - m.t < MEM_MS ? m.d : null;
+}
+function forget(keys) {
+  keys.forEach((k) => delete mem[k]);
+}
+
+// ---- LIFF SDK 非同步載入；ID Token 先用上次的 ----
+const sdkReady = new Promise((resolve, reject) => {
+  const s = document.createElement('script');
+  s.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
+  s.charset = 'utf-8';
+  s.onload = resolve;
+  s.onerror = () => reject(new Error('SDK_LOAD_FAILED'));
+  document.head.appendChild(s);
+});
+let readyResolve;
+app.ready = new Promise((r) => (readyResolve = r)); // LIFF 初始化完成、拿到新的 ID Token
+
+function savedToken() {
+  const t = store.get('tok', 864e5);
+  return t && t.exp - Date.now() > 5 * 60000 ? t.token : ''; // 至少還有 5 分鐘才用
+}
+
 /** 呼叫 GAS：不設定 Content-Type（text/plain），避免 CORS 預檢 */
 async function callGas(payload, timeoutMs) {
+  if (!app.idToken) await app.ready;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs || 20000);
   try {
     const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(Object.assign({ idToken: app.idToken }, payload)), signal: ctrl.signal });
     const text = await res.text();
-    try { return JSON.parse(text); } catch (e) { throw new Error('NON_JSON'); }
+    let r;
+    try { r = JSON.parse(text); } catch (e) { throw new Error('NON_JSON'); }
+    // 先用的舊 Token 被拒 → 等 LIFF 給新的再送一次
+    if (!r.ok && r.error === 'AUTH_FAILED' && app.early) {
+      app.early = false;
+      app.idToken = '';
+      store.del('tok');
+      return callGas(payload, timeoutMs);
+    }
+    return r;
   } finally {
     clearTimeout(timer);
   }
 }
 
-/** 讀取用：失敗就顯示錯誤頁 */
-async function load(payload) {
-  show('viewLoading');
+function setStale(on) {
+  document.body.classList.toggle('stale', on);
+  $('syncPill').classList.toggle('hidden', !on);
+}
+let toastTimer;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('hidden'), 3000);
+}
+
+/**
+ * 開啟一頁
+ *   key：快取鍵｜payload：要送給 GAS 的內容｜render(d)：畫面
+ *   回傳最新資料；中途切到別頁則回傳 null 且不畫
+ */
+async function view(key, payload, render) {
+  const nav = ++app.nav;
+  const hot = recall(key);
+  if (hot) {
+    setStale(false);
+    render(hot);
+    return hot;
+  }
+  const snap = store.get('v:' + key);
+  if (snap) {
+    setStale(true);
+    try { render(snap); } catch (e) { show('viewLoading'); } // 舊格式的快照畫不出來就算了
+  } else {
+    setStale(false);
+    show('viewLoading');
+  }
   let r;
   try {
     r = await callGas(payload);
   } catch (e) {
+    if (nav !== app.nav) return null;
+    setStale(false);
+    if (snap) { toast('連線不穩定，畫面是上次的資料'); document.body.classList.add('stale'); return null; }
     showError('連線逾時，請稍後再試。', e.name === 'AbortError' ? 'TIMEOUT' : e.message);
     return null;
   }
-  if (!r.ok) { showError(r.message || '載入失敗，請稍後再試。', r.error); return null; }
+  if (nav !== app.nav) return null;
+  setStale(false);
+  if (!r.ok) {
+    store.del('v:' + key);
+    showError(r.message || '載入失敗，請稍後再試。', r.error);
+    return null;
+  }
+  remember(key, r);
+  render(r);
   return r;
 }
 
@@ -463,10 +618,13 @@ const PROFILE_STATUS = {
 };
 const profile = { submissionId: newId() };
 
-async function openProfile() {
+function openProfile() {
   setBack(null);
-  const d = await load({ action: 'init' });
-  if (!d) return;
+  return view('profile', { action: 'init' }, renderProfile);
+}
+
+function renderProfile(d) {
+  profile.submissionId = newId();
   const c = d.coach || {};
   $('p_name').value = c.姓名 || (d.profile && d.profile.name) || '';
   $('p_phone').value = c.電話 || '';
@@ -506,6 +664,8 @@ $('btnProfile').addEventListener('click', async () => {
     staff: '資料已更新，管理員會確認是否加上教練身分。',
     inactive: '資料已送出，管理員會與你聯繫。',
   };
+  forget(['profile']);
+  store.del('v:profile');
   showDone(r.data.isNew ? '已送出審核' : '已儲存', msg[r.data.status] || '資料已送出。');
 });
 
@@ -514,19 +674,22 @@ $('btnProfile').addEventListener('click', async () => {
 // ================================================================
 const journal = { sessionId: '', submissionId: '', roster: [], options: {}, students: [] };
 
-async function openJournalList() {
+function openJournalList() {
   setBack(null);
-  const d = await load({ action: 'journalList' });
-  if (!d) return;
+  return view('jlist', { action: 'journalList' }, renderJournalList);
+}
+
+function renderJournalList(d) {
+  setBack(null);
   const pending = $('jl_pending');
   const written = $('jl_written');
   pending.innerHTML = '';
   written.innerHTML = '';
   if (!d.pending.length) pending.appendChild(el('div', { class: 'empty', text: '最近 14 天的課都寫完了 👍' }));
-  d.pending.forEach((s) => pending.appendChild(sessionItem(s, s.status === '預定' ? '' : s.status)));
+  d.pending.forEach((s) => pending.appendChild(sessionItem(s, s.confirmed ? '' : '未點名')));
   $('jl_writtenTitle').textContent = '已寫，可修改（送出後 ' + d.editDays + ' 天內）';
   if (!d.written.length) written.appendChild(el('div', { class: 'empty', text: '目前沒有可修改的日誌' }));
-  d.written.forEach((s) => written.appendChild(sessionItem(s, '修改至 ' + s.editUntil, s.topic)));
+  d.written.forEach((s) => written.appendChild(sessionItem(s, (s.confirmed ? '' : '未點名・') + '修改至 ' + s.editUntil, s.topic)));
   show('viewJournalList', '課程日誌');
 }
 
@@ -537,7 +700,7 @@ function sessionItem(s, tag, extra, onClick) {
       tag ? el('span', { class: 'tag', text: tag }) : null,
     ]),
     el('div', { text: s.className || '（未命名班級）' }),
-    el('div', { class: 'sub', text: [s.venue, s.lesson ? '第 ' + s.lesson + ' 堂' : '', extra ? '主題：' + extra : ''].filter(Boolean).join('・') }),
+    el('div', { class: 'sub', text: [s.place || s.venue, s.lesson ? '第 ' + s.lesson + ' 堂' : '', s.pendingClass ? '待成班' : '', extra ? '主題：' + extra : ''].filter(Boolean).join('・') }),
   ]);
 }
 
@@ -545,11 +708,20 @@ function sessionItem(s, tag, extra, onClick) {
  * opt.preselect：開啟後直接加入這位學員的個別紀錄（從課堂學員頁進來時）
  * opt.back：返回鍵與送出後要回到的頁面（預設回日誌清單）
  */
-async function openJournalForm(sessionId, opt) {
+function openJournalForm(sessionId, opt) {
   opt = opt || {};
-  const d = await load({ action: 'journalGet', sessionId: sessionId });
-  if (!d) return;
-  journal.back = opt.back || { label: '回到日誌清單', fn: openJournalList };
+  // 從課堂學員頁進來：資料已經一起帶來，不必請求
+  if (opt.data) {
+    app.nav++;
+    setStale(false);
+    renderJournalForm(sessionId, opt, opt.data);
+    return;
+  }
+  return view('j:' + sessionId, { action: 'journalGet', sessionId: sessionId }, (d) => renderJournalForm(sessionId, opt, d));
+}
+
+function renderJournalForm(sessionId, opt, d) {
+  journal.back = opt.back || { label: '回到日誌清單', fn: openJournalList, returnTo: 'list' };
   journal.sessionId = sessionId;
   journal.submissionId = newId();
   journal.roster = d.roster;
@@ -560,7 +732,7 @@ async function openJournalForm(sessionId, opt) {
 
   const s = d.session;
   $('jf_title').textContent = s.dateText + ' ' + s.start + (s.end ? '–' + s.end : '') + '　' + (s.className || '');
-  $('jf_sub').textContent = [s.tag, s.venue, s.lesson ? '第 ' + s.lesson + ' 堂' : '', '學員 ' + d.roster.length + ' 人'].filter(Boolean).join('・');
+  $('jf_sub').textContent = [s.tag, s.place || s.venue, s.lesson ? '第 ' + s.lesson + ' 堂' : '', '學員 ' + d.roster.length + ' 人'].filter(Boolean).join('・');
 
   const j = d.journal || {};
   $('jf_topic').value = j.教學主題 || '';
@@ -573,7 +745,12 @@ async function openJournalForm(sessionId, opt) {
   $('jf_methodField').classList.toggle('hidden', !methods.length);
   renderChips($('jf_method'), 'method', methods, j.訓練方式 ? [j.訓練方式] : [], 'radio');
 
-  banner('jf_banner', d.journal ? '修改已送出的日誌，可修改至 ' + j.editUntil + '。' : '', false);
+  journal.confirmState = d.confirmState;
+  const notes = [];
+  if (d.journal) notes.push('修改已送出的日誌，可修改至 ' + j.editUntil + '。');
+  if (d.confirmState === 'confirm') notes.push('這堂還沒有確認上課（點名），送出日誌後請接著確認，系統才會扣堂。');
+  banner('jf_banner', notes.join('\n'), d.confirmState === 'confirm');
+  $('jf_banner').style.whiteSpace = 'pre-line';
   (d.individuals || []).forEach((i) => addStudentCard(i));
   let focusCard = null;
   if (opt.preselect && d.roster.some((r) => r.id === opt.preselect)) {
@@ -660,13 +837,27 @@ $('btnJournal').addEventListener('click', async () => {
     $('jf_topic').scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
+  const sid = journal.sessionId;
+  const back = journal.back;
   const r = await send($('btnJournal'), {
-    action: 'journalSave', sessionId: journal.sessionId, submissionId: journal.submissionId,
-    journal: j, individuals: journal.students.map((x) => x.read()),
+    action: 'journalSave', sessionId: sid, submissionId: journal.submissionId,
+    journal: j, individuals: journal.students.map((x) => x.read()), returnTo: back.returnTo || 'roster',
   });
   if (!r.ok) {
-    if (r.uncertain) return showDone('可能已送出', r.message, journal.back);
+    if (r.uncertain) return showDone('可能已送出', r.message, back);
     return banner('jf_banner', r.message, true);
+  }
+  // GAS 已回傳要回去那一頁的資料 → 返回時不必再請求
+  forget(['j:' + sid]);
+  store.del('v:j:' + sid);
+  if (r.data.roster) remember('r:' + sid, Object.assign({ ok: true }, r.data.roster));
+  else forget(['r:' + sid]);
+  if (r.data.list) remember('jlist', Object.assign({ ok: true }, r.data.list));
+  else forget(['jlist']);
+  if (r.data.confirmState === 'confirm') {
+    const c = r.data.roster && r.data.roster.confirm;
+    return showDone(r.data.isNew ? '日誌已送出' : '已儲存修改', '這堂還沒確認上課，確認後系統才會扣堂。',
+      { label: '去確認上課', fn: () => openConfirm(sid, back.fn, c) });
   }
   showDone(r.data.isNew ? '日誌已送出' : '已儲存修改', '辛苦了！', journal.back);
 });
@@ -676,28 +867,33 @@ $('btnJournal').addEventListener('click', async () => {
 // ================================================================
 const ATTEND_TAG = { 出席: '', 補課出席: '', 請假: '本堂請假', 缺席: '本堂缺席' };
 
-async function openRosterList() {
+function openRosterList() {
   setBack(null);
-  const d = await load({ action: 'rosterSessions' });
-  if (!d) return;
+  return view('rlist', { action: 'rosterSessions' }, renderRosterList);
+}
+
+function renderRosterList(d) {
+  setBack(null);
   const list = $('rl_list');
   list.innerHTML = '';
   if (!d.items.length) list.appendChild(el('div', { class: 'empty', text: '前後一週沒有你授課的課堂' }));
   d.items.forEach((s) => list.appendChild(
-    sessionItem(s, s.date === d.today ? '今天' : '', '', () => openRoster(s.id, openRosterList))
+    sessionItem(s, s.date === d.today ? (s.confirmed ? '今天' : '今天・未點名') : (s.date < d.today && !s.confirmed ? '未點名' : ''), '', () => openRoster(s.id, openRosterList))
   ));
   show('viewRosterList', '課堂學員');
 }
 
 /** back：返回鍵要回到哪裡；從 LINE 卡片直接開啟時沒有返回鍵 */
-async function openRoster(sessionId, back) {
-  const d = await load({ action: 'rosterGet', sessionId: sessionId });
-  if (!d) return;
+function openRoster(sessionId, back) {
+  return view('r:' + sessionId, { action: 'rosterGet', sessionId: sessionId }, (d) => renderRoster(sessionId, back, d));
+}
+
+function renderRoster(sessionId, back, d) {
   const s = d.session;
   const reopen = () => openRoster(sessionId, back);
 
   $('r_title').textContent = s.dateText + ' ' + s.start + (s.end ? '–' + s.end : '') + '　' + (s.className || '');
-  $('r_sub').textContent = [s.tag, s.venue, s.lesson ? '第 ' + s.lesson + ' 堂' : '', '本班已上 ' + d.heldCount + ' 堂'].filter(Boolean).join('・');
+  $('r_sub').textContent = [s.tag, s.place || s.venue, s.pendingClass ? '待成班' : '', s.lesson ? '第 ' + s.lesson + ' 堂' : '', '本班已上 ' + d.heldCount + ' 堂'].filter(Boolean).join('・');
 
   // 上一堂的紀錄
   const prevBox = $('r_prev');
@@ -713,21 +909,45 @@ async function openRoster(sessionId, back) {
 
   // 學員卡片
   const canWrite = d.journalState === 'write' || d.journalState === 'edit';
+  // 日誌表單、點名的資料已經一起帶來 → 點了直接開，不必請求
+  const jf = d.journalForm;
+  const formData = jf ? Object.assign({
+    session: s,
+    roster: d.students.map((x) => ({ id: x.id, name: x.name, level: x.level })),
+    confirmState: d.confirmState,
+  }, jf) : null;
   const toJournal = (preselect) => openJournalForm(sessionId, {
     preselect: preselect,
-    back: { label: '回到課堂學員', fn: reopen },
+    data: formData,
+    back: { label: '回到課堂學員', fn: reopen, returnTo: 'roster' },
   });
   $('r_count').textContent = '學員 ' + d.students.length + ' 人' + (d.students.length ? '・點名字展開紀錄' : '');
   const box = $('r_students');
+  // 換上新資料時保留已展開的學員
+  const opened = new Set(Array.from(box.querySelectorAll('details[open]')).map((x) => x.dataset.id));
   box.innerHTML = '';
   if (!d.students.length) box.appendChild(el('div', { class: 'empty', text: '這一堂目前沒有報名或出缺勤紀錄的學員' }));
-  d.students.forEach((st) => box.appendChild(studentCard(st, d.noteCount, canWrite ? () => toJournal(st.id) : null)));
+  d.students.forEach((st) => {
+    const card = studentCard(st, d.noteCount, canWrite ? () => toJournal(st.id) : null);
+    if (opened.has(st.id)) card.open = true;
+    box.appendChild(card);
+  });
 
-  // 底部按鈕
-  const label = { write: '寫這堂的日誌', edit: '修改這堂的日誌' }[d.journalState];
-  $('r_bar').classList.toggle('hidden', !label);
-  if (label) {
-    $('btnRosterJournal').textContent = label;
+  // 底部按鈕：確認上課＋日誌
+  const cLabel = { confirm: '確認上課', edit: '修改點名' }[d.confirmState];
+  const jLabel = { write: '寫日誌', edit: '修改日誌' }[d.journalState];
+  $('btnRosterConfirm').classList.toggle('hidden', !cLabel);
+  $('btnRosterJournal').classList.toggle('hidden', !jLabel);
+  $('r_barInner').classList.toggle('two', !!(cLabel && jLabel));
+  $('r_bar').classList.toggle('hidden', !cLabel && !jLabel);
+  if (cLabel) {
+    $('btnRosterConfirm').textContent = cLabel;
+    $('btnRosterConfirm').className = d.confirmState === 'confirm' ? 'primary' : 'ghost';
+    $('btnRosterConfirm').onclick = () => openConfirm(sessionId, reopen, d.confirm);
+  }
+  if (jLabel) {
+    $('btnRosterJournal').textContent = jLabel;
+    $('btnRosterJournal').className = cLabel && d.confirmState === 'confirm' ? 'ghost' : 'primary';
     $('btnRosterJournal').onclick = () => toJournal('');
   }
   setBack(back || null);
@@ -737,6 +957,7 @@ async function openRoster(sessionId, back) {
 function studentCard(st, noteCount, onWrite) {
   const pills = [];
   if (st.makeup) pills.push(el('span', { class: 'pill', text: '補課生' }));
+  if (st.arrivedAt) pills.push(el('span', { class: 'pill ok', text: '已到場 ' + st.arrivedAt }));
   if (ATTEND_TAG[st.thisStatus]) pills.push(el('span', { class: 'pill grey', text: ATTEND_TAG[st.thisStatus] }));
   if (st.advice) pills.push(el('span', { class: 'pill warn', text: st.advice }));
   if (!st.notes.length) pills.push(el('span', { class: 'pill grey', text: '尚無個別紀錄' }));
@@ -763,7 +984,7 @@ function studentCard(st, noteCount, onWrite) {
     ]));
   }
 
-  return el('details', { class: 'sc' }, [
+  return el('details', { class: 'sc', 'data-id': st.id }, [
     el('summary', {}, [
       el('div', { class: 'sc-top' }, [
         el('span', { class: 'sc-name' }, [document.createTextNode(st.name), st.level ? el('span', { class: 'sc-level', text: st.level }) : null]),
@@ -776,18 +997,140 @@ function studentCard(st, noteCount, onWrite) {
 }
 
 // ================================================================
+// 確認上課（點名）
+// ================================================================
+const CHOICES = ['出席', '請假', '缺席'];
+const confirmPage = { sessionId: '', submissionId: '', rows: [], back: null };
+
+/**
+ * back：返回鍵與送出後要回到的頁面
+ * data：課堂學員頁已經帶來的點名資料（有的話不必請求）
+ */
+function openConfirm(sessionId, back, data) {
+  if (data) {
+    app.nav++;
+    setStale(false);
+    renderConfirm(sessionId, back, data);
+    return;
+  }
+  return view('c:' + sessionId, { action: 'confirmGet', sessionId: sessionId }, (d) => renderConfirm(sessionId, back, d));
+}
+
+function renderConfirm(sessionId, back, d) {
+  confirmPage.sessionId = sessionId;
+  confirmPage.submissionId = newId();
+  confirmPage.back = back || null;
+  confirmPage.rows = [];
+
+  const s = d.session;
+  $('c_title').textContent = s.dateText + ' ' + s.start + (s.end ? '–' + s.end : '') + '　' + (s.className || '');
+  $('c_sub').textContent = [s.tag, s.place || s.venue, s.lesson ? '第 ' + s.lesson + ' 堂' : '', '學員 ' + d.students.length + ' 人'].filter(Boolean).join('・');
+  banner('c_banner', d.state === 'edit'
+    ? '已於 ' + d.confirmedAt + ' 確認上課，可修改至 ' + d.editUntil + '；修改後扣堂紀錄會一併調整。'
+    : '', false);
+  $('c_hint').textContent = '有掃 QR 簽到的學員已預設為出席。出席' + (d.deductAbsent ? '與缺席' : '') + '會扣一堂，請假不扣；送出後 ' + d.editDays + ' 天內可以修改。';
+
+  const list = $('c_list');
+  list.innerHTML = '';
+  if (!d.students.length) list.appendChild(el('div', { class: 'empty', text: '這一堂目前沒有報名或出缺勤紀錄的學員' }));
+  d.students.forEach((st) => {
+    const chips = el('div', { class: 'chips grid3' });
+    renderChips(chips, 'c_' + st.id, CHOICES, st.choice ? [st.choice] : [], 'radio');
+    const meta = st.arrivedAt ? '已到場 ' + st.arrivedAt : '未簽到';
+    const box = el('div', { class: 'att' + (st.choice ? '' : ' unset') }, [
+      el('div', { class: 'att-top' }, [
+        el('span', { class: 'att-name' }, [
+          document.createTextNode(st.name),
+          st.level ? el('span', { class: 'sc-level', text: st.level }) : null,
+          st.makeup ? el('span', { class: 'sc-level', text: '・補課生' }) : null,
+        ]),
+        el('span', { class: 'att-meta' + (st.arrivedAt ? ' in' : ''), text: meta }),
+      ]),
+      chips,
+    ]);
+    chips.addEventListener('change', () => { box.classList.toggle('unset', !checked(chips)[0]); updateSummary(); });
+    chips.addEventListener('click', () => setTimeout(() => { box.classList.toggle('unset', !checked(chips)[0]); updateSummary(); }, 0));
+    confirmPage.rows.push({ id: st.id, chips: chips, box: box });
+    list.appendChild(box);
+  });
+  $('btnAllPresent').classList.toggle('hidden', !d.students.length);
+  $('btnConfirm').textContent = d.state === 'edit' ? '儲存修改' : '確認上課';
+  $('btnConfirm').disabled = !d.students.length;
+  updateSummary();
+  setBack(confirmPage.back);
+  show('viewConfirm', d.state === 'edit' ? '修改點名' : '確認上課');
+}
+
+function updateSummary() {
+  const n = { 出席: 0, 請假: 0, 缺席: 0, 未選: 0 };
+  confirmPage.rows.forEach((r) => { n[checked(r.chips)[0] || '未選']++; });
+  $('c_summary').textContent = '出席 ' + n.出席 + '・請假 ' + n.請假 + '・缺席 ' + n.缺席 + (n.未選 ? '・尚未選擇 ' + n.未選 : '');
+}
+
+$('btnAllPresent').addEventListener('click', () => {
+  confirmPage.rows.forEach((r) => {
+    if (checked(r.chips)[0]) return;
+    const input = r.chips.querySelector('input[value="出席"]');
+    r.chips.querySelectorAll('input').forEach((x) => (x.dataset.was = ''));
+    input.checked = true;
+    input.dataset.was = '1';
+    r.box.classList.remove('unset');
+  });
+  updateSummary();
+});
+
+$('btnConfirm').addEventListener('click', async () => {
+  const items = confirmPage.rows.map((r) => ({ 學員: r.id, 狀態: checked(r.chips)[0] || '' }));
+  const firstUnset = confirmPage.rows.find((r) => !checked(r.chips)[0]);
+  if (firstUnset) {
+    banner('c_banner', '還有學員沒有選擇出缺勤；沒到又沒請假的請選「缺席」。', true);
+    firstUnset.box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  const sid = confirmPage.sessionId;
+  const r = await send($('btnConfirm'), {
+    action: 'confirmSave', sessionId: sid, submissionId: confirmPage.submissionId, items: items,
+  });
+  const next = { label: '回到課堂學員', fn: confirmPage.back || (() => openRoster(sid, openRosterList)) };
+  if (!r.ok) {
+    if (r.uncertain) return showDone('可能已送出', r.message, next);
+    return banner('c_banner', r.message, true);
+  }
+  // 回傳的課堂學員資料直接用；清單上的「未點名」標示要重新讀
+  forget(['c:' + sid, 'rlist', 'jlist']);
+  store.del('v:c:' + sid);
+  if (r.data.roster) remember('r:' + sid, Object.assign({ ok: true }, r.data.roster));
+  else forget(['r:' + sid]);
+  const m = r.data.summary;
+  showDone(r.data.isNew ? '已確認上課' : '已儲存修改',
+    '出席 ' + m.出席 + '・請假 ' + m.請假 + '・缺席 ' + m.缺席 + '，共扣 ' + m.扣堂 + ' 堂。', next);
+});
+
+// ================================================================
 // 不可排日期
 // ================================================================
 const unavail = { submissionId: newId(), today: '' };
 
-async function openUnavail() {
+function openUnavail() {
   setBack(null);
-  const d = await load({ action: 'unavailList' });
-  if (!d) return;
+  return view('unavail', { action: 'unavailList' }, (d) => renderUnavailPage(d));
+}
+
+/** warnList：剛新增的不可排日期與已排的課衝突時，列在最上方 */
+function renderUnavailPage(d, warnList) {
+  setBack(null);
+  const w = $('u_warn');
+  w.innerHTML = '';
+  w.classList.toggle('hidden', !(warnList && warnList.length));
+  if (warnList && warnList.length) {
+    w.appendChild(el('div', { text: '已登記。這段期間有 ' + warnList.length + ' 堂課排給你，已通知管理員安排代課：' }));
+    w.appendChild(el('ul', { class: 'conflict' }, warnList.map((c) =>
+      el('li', { text: c.dateText + ' ' + c.start + '　' + c.className + (c.place ? '（' + c.place + '）' : '') }))));
+  }
   unavail.today = d.today;
   $('u_start').min = d.today;
   $('u_end').min = d.today;
-  if (!$('u_start').value) $('u_start').value = d.today;
+  if (!$('u_start').value || $('u_start').value < d.today) $('u_start').value = d.today;
   renderUnavail(d.items);
   show('viewUnavail', '不可排日期');
 }
@@ -801,17 +1144,22 @@ function renderUnavail(items) {
     const del = el('button', { class: 'link', type: 'button', text: '刪除' });
     del.addEventListener('click', async () => {
       if (!confirmInline(del)) return;
+      // 先從畫面拿掉，失敗再放回來
+      row.style.opacity = '.4';
       del.disabled = true;
       try {
         const r = await callGas({ action: 'unavailDelete', id: it.id });
-        if (!r.ok) { alertBox(r.message || '刪除失敗'); del.disabled = false; return; }
-      } catch (e) { alertBox('連線不穩定，請稍後再試'); del.disabled = false; return; }
-      openUnavail();
+        if (!r.ok) { alertBox(r.message || '刪除失敗'); del.disabled = false; row.style.opacity = ''; return; }
+        const d = Object.assign({ ok: true }, r.list);
+        remember('unavail', d);
+        renderUnavailPage(d);
+      } catch (e) { alertBox('連線不穩定，請稍後再試'); del.disabled = false; row.style.opacity = ''; }
     });
-    list.appendChild(el('div', { class: 'item' }, [
+    const row = el('div', { class: 'item' }, [
       el('div', { class: 'top' }, [el('span', { text: range }), del]),
       el('div', { class: 'sub', text: it.reason || '（未填原因）' }),
-    ]));
+    ]);
+    list.appendChild(row);
   });
 }
 
@@ -851,7 +1199,15 @@ $('btnUnavail').addEventListener('click', async () => {
   unavail.submissionId = newId();
   $('u_end').value = '';
   $('u_reason').value = '';
-  openUnavail();
+  if (r.data.list) {
+    // GAS 已回傳新的清單，不必再請求
+    const d = Object.assign({ ok: true }, r.data.list);
+    remember('unavail', d);
+    renderUnavailPage(d, r.data.conflicts);
+  } else {
+    forget(['unavail']);
+    openUnavail();
+  }
 });
 
 // ================================================================
@@ -878,32 +1234,59 @@ function readParams() {
   merge(location.search);
   return out;
 }
-const START_PARAMS = readParams(); // liff.init() 之前先讀一次
 
-async function main() {
+function route(params) {
+  app.page = params.page || 'profile';
+  if (app.page === 'journal') {
+    if (params.session) openJournalForm(params.session); else openJournalList();
+  } else if (app.page === 'roster') {
+    if (params.session) openRoster(params.session, openRosterList); else openRosterList();
+  } else if (app.page === 'confirm' && params.session) {
+    openConfirm(params.session, () => openRoster(params.session, openRosterList));
+  } else if (app.page === 'unavailable') {
+    openUnavail();
+  } else {
+    openProfile();
+  }
+}
+
+/** LIFF 初始化；完成後換上新的 ID Token 並記下來，下次開啟可以先用 */
+async function initLiff() {
   try {
+    await sdkReady;
     await liff.init({ liffId: LIFF_ID });
   } catch (e) {
+    if (app.early) return toast('LINE 連線異常，如果按鈕沒反應請關閉後重開'); // 舊 Token 還能用，先不擋
     return showError('無法連接 LINE，請從官方帳號的選單開啟。', e.code || e.message);
   }
   if (!liff.isLoggedIn()) {
     liff.login({ redirectUri: location.href });
     return;
   }
-  app.idToken = liff.getIDToken();
-  if (!app.idToken) return showError('無法取得 LINE 身分，請關閉後重新開啟。', 'NO_ID_TOKEN');
-
-  const params = Object.assign({}, START_PARAMS, readParams());
-  app.page = params.page || 'profile';
-  if (app.page === 'journal') {
-    if (params.session) openJournalForm(params.session); else openJournalList();
-  } else if (app.page === 'roster') {
-    if (params.session) openRoster(params.session, openRosterList); else openRosterList();
-  } else if (app.page === 'unavailable') {
-    openUnavail();
-  } else {
-    openProfile();
+  const token = liff.getIDToken();
+  if (!token) {
+    if (!app.early) showError('無法取得 LINE 身分，請關閉後重新開啟。', 'NO_ID_TOKEN');
+    return;
   }
+  let exp = 0;
+  try { exp = liff.getDecodedIDToken().exp * 1000; } catch (e) { /* 取不到就不保存 */ }
+  if (exp) store.set('tok', { token: token, exp: exp });
+  app.idToken = token;
+  app.early = false;
+  readyResolve();
+}
+
+function main() {
+  const params = readParams();
+  // 從選單開啟的第一次載入（網址帶 liff.state）會在 liff.init() 時轉址，這時先不送請求，只畫上次的畫面
+  const firstHop = new URLSearchParams(location.search).has('liff.state');
+  const token = firstHop ? '' : savedToken();
+  if (token) {
+    app.idToken = token;
+    app.early = true;
+  }
+  initLiff();
+  route(params);
 }
 main();
 </script>
